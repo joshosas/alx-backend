@@ -8,7 +8,7 @@ from base_caching import BaseCaching
 
 class FIFOCache(BaseCaching):
     """a class that allows storing, retreiving
-       and deleting of information using the 
+       and deleting of information using the
        Firet-In-First-Out (FIFO) Replacement Policy.
     """
 
