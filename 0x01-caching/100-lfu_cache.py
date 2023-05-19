@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-"""Least Frequently Used (LFU) caching module.
+"""Least Frequencyuently Used (LFU) caching module.
 """
-from collections import defaultdict
+from collections import OrderedDict
 
-from datetime import datetime
-
-from functools import total_ordering
+from base_caching import BaseCaching
 
 
 class LFUCache(BaseCaching):
@@ -15,50 +13,62 @@ class LFUCache(BaseCaching):
     """
 
     def __init__(self):
+        """Initializes the cache.
+        """
         super().__init__()
-        self.freq = defaultdict(int)
-        self.last_used = {}
-        self.access_count = 0
+        self.cache_data = OrderedDict()
+        self.keys_frequency = []
+
+    def __reorder_items(self, mru_key):
+        """Reorders all items in the cache in order most
+        recently used item.
+        """
+        max_positions = []
+        mru_frequency = 0
+        mru_pos = 0
+        ins_pos = 0
+        for i, key_frequency in enumerate(self.keys_frequency):
+            if key_frequency[0] == mru_key:
+                mru_frequency = key_frequency[1] + 1
+                mru_pos = i
+                break
+            elif len(max_positions) == 0:
+                max_positions.append(i)
+            elif key_frequency[1] < self.keys_frequency[max_positions[-1]][1]:
+                max_positions.append(i)
+        max_positions.reverse()
+        for pos in max_positions:
+            if self.keys_frequency[pos][1] > mru_frequency:
+                break
+            ins_pos = pos
+        self.keys_frequency.pop(mru_pos)
+        self.keys_frequency.insert(ins_pos, [mru_key, mru_frequency])
 
     def put(self, key, item):
+        """Adds an item in the cache.
+        """
         if key is None or item is None:
             return
-
-        if len(self.cache_data) >= self.MAX_ITEMS:
-            # Find the least frequency used item(s)
-            min_freq = min(self.freq.values())
-            least_frequent_items = [
-                key for key, value in self.freq.items() if value == min_freq
-            ]
-
-            if len(least_frequent_items) > 1:
-                # If there are multiple least frequent items, use LRU algorithm
-                least_recently_used_item = min(
-                    least_frequent_items, key=lambda x: self.last_used[x]
-                )
-                del self.cache_data[least_recently_used_item]
-                del self.freq[least_recently_used_item]
-                del self.last_used[least_recently_used_item]
-                print(f"DISCARD: {least_recently_used_item}")
-
-            else:
-                item_to_discard = least_frequent_items[0]
-                del self.cache_data[item_to_discard]
-                del self.freq[item_to_discard]
-                del self.last_used[item_to_discard]
-                print(f"DISCARD: {item_to_discard}")
-
+        if key not in self.cache_data:
+            if len(self.cache_data) + 1 > BaseCaching.MAX_ITEMS:
+                lfu_key, _ = self.keys_frequency[-1]
+                self.cache_data.pop(lfu_key)
+                self.keys_frequency.pop()
+                print("DISCARD:", lfu_key)
             self.cache_data[key] = item
-            self.freq[key] += 1
-            self.last_used[key] = self.access_count
-            self.access_count += 1
+            ins_index = len(self.keys_frequency)
+            for i, key_frequency in enumerate(self.keys_frequency):
+                if key_frequency[1] == 0:
+                    ins_index = i
+                    break
+            self.keys_frequency.insert(ins_index, [key, 0])
+        else:
+            self.cache_data[key] = item
+            self.__reorder_items(key)
 
-        def get(self, key):
-            if key is None or key not in self.cache_data:
-                return None
-
-            self.freq[key] += 1
-            self.last_used[key] = self.access_count
-            self.access_count += 1
-
-            return self.cache_data[key]
+    def get(self, key):
+        """Retrieves an item by key.
+        """
+        if key is not None and key in self.cache_data:
+            self.__reorder_items(key)
+        return self.cache_data.get(key, None)
